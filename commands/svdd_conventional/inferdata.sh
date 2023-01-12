@@ -1,0 +1,9 @@
+python tools/svdd-default.py  --dim 5  --fixed_target 1 --hidden_layers "512 256 128" --modeldir models_conventional --run True
+python tools/svdd-default.py  --dim 8  --fixed_target 1 --hidden_layers "512 256 128" --modeldir models_conventional --run True
+python tools/svdd-default.py  --dim 13  --fixed_target 1 --hidden_layers "512 256 128" --modeldir models_conventional --run True
+python tools/svdd-default.py  --dim 21  --fixed_target 1 --hidden_layers "512 256 128" --modeldir models_conventional --run True
+python tools/svdd-default.py  --dim 34  --fixed_target 1 --hidden_layers "512 256 128" --modeldir models_conventional --run True
+python tools/svdd-default.py  --dim 55  --fixed_target 1 --hidden_layers "512 256 128" --modeldir models_conventional --run True
+python tools/svdd-default.py  --dim 89  --fixed_target 1 --hidden_layers "512 256 128" --modeldir models_conventional --run True
+python tools/svdd-default.py  --dim 144  --fixed_target 1 --hidden_layers "512 256 128" --modeldir models_conventional --run True
+python tools/svdd-default.py  --dim 233 --fixed_target 1 --hidden_layers "512 256 128" --modeldir models_conventional --run True

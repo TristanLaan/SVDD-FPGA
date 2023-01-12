@@ -6,6 +6,24 @@ __pycache__/
 # C extensions
 *.so
 
+
+#data
+data/
+
+#models
+models_conventional/
+model_quantised/
+models_trained/
+models/
+tb_logs/
+*.h5
+
+#plots
+*.pdf
+*.png
+
+
+
 # Distribution / packaging
 .Python
 build/
