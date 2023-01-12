@@ -25,7 +25,7 @@ logger.addHandler(ch)
 
 #####  Tensorflow related #####
 import tensorflow as tf
-
+from sklearn.utils import shuffle
 import os
 import numpy as np
 import glob
@@ -184,12 +184,20 @@ def test(dataset_len, data_dim, etype_testing, training_data, testing_data, mode
         if not model:
             #create empty SVDD model and load weights
             if modelpath:
-                model = modeldefault.VariationalAutoencoderModel(hl_int_list, model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,quantised=Flags.quantised,hls4ml=Flags.hls4ml,modelpath=modelpath)
+                model = modeldefault.VariationalAutoencoderModel(hl_int_list, model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,quantised=Flags.quantised,hls4ml=Flags.hls4ml,modeldir=Flags.modeldir,modelpath=modelpath)
             else:
-                model = modeldefault.VariationalAutoencoderModel(hl_int_list, model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,quantised=Flags.quantised,hls4ml=Flags.hls4ml)
+                model = modeldefault.VariationalAutoencoderModel(hl_int_list, model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,quantised=Flags.quantised,hls4ml=Flags.hls4ml,modeldir=Flags.modeldir)
 
         print(model)
         #Evaluate radius for training with output r_max
+        training_data = shuffle(training_data)
+        testing_data, etype_testing = shuffle(testing_data, etype_testing)
+
+        training_data   = training_data[:10000]
+        testing_data    = testing_data[:10000]
+        etype_testing   = etype_testing[:10000]
+
+
         r_max = model.evaluate_radius_max(training_data,100000)
         logger.debug("radius max is: %s" %(r_max))
 
@@ -198,6 +206,7 @@ def test(dataset_len, data_dim, etype_testing, training_data, testing_data, mode
 
         #evaluate output vector of the SVDD and calculate the scores
         # for i in range(0, Flags.iterations, 1):
+        
         scores = model.evaluate_radius(testing_data, r_max,Flags.batch)
 
         # """
@@ -211,6 +220,8 @@ def test(dataset_len, data_dim, etype_testing, training_data, testing_data, mode
         mask_bkg = (etype_testing == 2)
         logger.debug("mask_bkg.shape: %s" %(mask_bkg.shape))
         logger.debug("scores.shape: %s" %(scores.shape))
+
+
 
         # loop over the event types to get the score from all of them
         for key in sgn_dict:
@@ -248,11 +259,20 @@ def test(dataset_len, data_dim, etype_testing, training_data, testing_data, mode
             Epsilon3.append(eps3)
             Epsilon4.append(eps4)
 
-            outdirscores = os.path.join('results',Flags.modeldir,'scores',model_name,key)
 
-            outdirROCs = os.path.join('results',Flags.modeldir,'ROCs',model_name,key)
 
-            outdirsmetrics = os.path.join('results',Flags.modeldir,'metrics',model_name,key)
+            
+
+            if Flags.hls4ml:
+                outdirscores = os.path.join('results',Flags.modeldir,"hls4ml_wrapper",'scores',model_name,key)
+                outdirROCs = os.path.join('results',Flags.modeldir,"hls4ml_wrapper",'ROCs',model_name,key)
+                outdirsmetrics = os.path.join('results',Flags.modeldir,"hls4ml_wrapper",'metrics',model_name,key)
+            else:
+                outdirscores = os.path.join('results',Flags.modeldir,'scores',model_name,key)
+                outdirROCs = os.path.join('results',Flags.modeldir,'ROCs',model_name,key)
+                outdirsmetrics = os.path.join('results',Flags.modeldir,'metrics',model_name,key)
+
+
             if not os.path.exists(outdirscores):
                 os.makedirs(outdirscores)
             if not os.path.exists(outdirROCs):

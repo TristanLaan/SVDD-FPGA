@@ -144,7 +144,16 @@ sgn_label_dict = {'Ato4l':r'$A \rightarrow 4l$','SM':r'$SM$', 'hChToTauNu':r'$h^
 #     return
 
 def makeROCs(Flags):
-    outputdir = os.path.join("figures",Flags.modeldir,Flags.plotdir)
+
+
+    if Flags.hls4ml:
+        outputdir = os.path.join("figures","hls4ml_wrapper",Flags.modeldir,Flags.plotdir)
+    else:
+        outputdir = os.path.join("figures",Flags.modeldir,Flags.plotdir)
+
+        
+
+    
     if not os.path.exists(outputdir):
         os.makedirs(outputdir)
     plt.figure()
@@ -165,11 +174,20 @@ def makeROCs(Flags):
             logger.info("plotting: %s" % model)
             logger.info("signal: %s" % key)
 
-            outdirscores = os.path.join('results',Flags.modeldir,'scores',model,key)
 
-            outdirROCs = os.path.join('results',Flags.modeldir,'ROCs',model,key)
+            if Flags.hls4ml:
+                outdirscores = os.path.join('results',Flags.modeldir,"hls4ml_wrapper",'scores',model,key)
+                outdirROCs = os.path.join('results',Flags.modeldir,"hls4ml_wrapper",'ROCs',model,key)
+                outdirsmetrics = os.path.join('results',Flags.modeldir,"hls4ml_wrapper",'metrics',model,key)
+            else:
+                outdirscores = os.path.join('results',Flags.modeldir,'scores',model,key)
 
-            outdirsmetrics = os.path.join('results',Flags.modeldir,'metrics',model,key)
+                outdirROCs = os.path.join('results',Flags.modeldir,'ROCs',model,key)
+
+                outdirsmetrics = os.path.join('results',Flags.modeldir,'metrics',model,key)
+
+
+            
             logger.info("loading %s" % (os.path.join(outdirROCs,'fpr.txt')))
             logger.info("loading %s" % (os.path.join(outdirROCs,'tpr.txt')))
 
@@ -236,6 +254,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--n_comb', type=int, default=2, help='Number of combinations')   
     
+    parser.add_argument('--hls4ml', type=bool, default='False', help='put quantised model in hls4ml wrapper')
+
+
     Flags, unparsed = parser.parse_known_args()
 
     #to csv

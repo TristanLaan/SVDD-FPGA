@@ -14,6 +14,8 @@ from tensorflow.keras import regularizers
 from scipy.stats import multivariate_normal
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import load_model
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.regularizers import l1
 
 
 from qkeras.qlayers import QDense, QActivation
@@ -77,6 +79,9 @@ class VariationalAutoencoderModel():
         self.c = c
         self.verbose = verbose
         self.hls4ml_model = None
+        self.model = None
+
+
 
         self.model_filename = str(modeldir)+ '/' + filename + '.h5'
         self.modeldir = str(modeldir)
@@ -88,18 +93,17 @@ class VariationalAutoencoderModel():
 
         # if hls4ml and quantised:
 
-        if modelpath:
+        if self.modelpath:
             if "models_conventional" in self.modeldir:
                 logger.info("Building NORMAL model")
                 model = self.build_lhcdata_model()
                 model.load_weights(self.modelpath)
-
             elif quantised:
-                logger.debug('Loading quantised model: %s' %(modelpath))
+                logger.debug('Loading quantised model: %s' %(self.modelpath))
                 model = self.load_lhcdata_model_quantized()
             else:
-                logger.debug('Loading standard model: %s' %(modelpath))
-                model = self.load_lhcdata_model_quantized()
+                logger.debug('Loading standard model: %s' %(self.modelpath))
+                model = self.load_lhcdata_model()
                 model.summary()
 
         elif quantised:
@@ -126,21 +130,18 @@ class VariationalAutoencoderModel():
         return output_data
 
     def load_lhcdata_model_quantized(self):
-
         from qkeras.utils import _add_supported_quantized_objects
         co = {}
         _add_supported_quantized_objects(co)
         model = load_model(self.modelpath, custom_objects=co)
         model.summary()
+        # # instantiate encoder model
+        # if self.mode == 'ordered':
+        #     self.encoder = Model(model.input, model.layers[-1].output, name='encoder')
+        # self.encoder.compile(optimizer='adam', loss='mean_squared_error')
 
-        
-        # instantiate encoder model
-        if self.mode == 'ordered':
-            self.encoder = Model(model.input, model.layers[-1].output, name='encoder')
-        self.encoder.compile(optimizer='adam', loss='mean_squared_error')
-
-
-        return self.encoder
+        self.encoder = model
+        return model
 
     def load_lhcdata_model(self):
         model = load_model(self.modelpath)
@@ -148,12 +149,13 @@ class VariationalAutoencoderModel():
         model.summary()
 
 
-        if self.mode == 'ordered':
-            self.encoder = Model(model.input, model.layers[-1].output, name='encoder')
-        self.encoder.compile(optimizer='adam', loss='mean_squared_error')
+        # if self.mode == 'ordered':
+        #     self.encoder = Model(model.input, model.layers[-1].output, name='encoder')
+        # self.encoder.compile(optimizer='adam', loss='mean_squared_error')
 
 
-        return self.encoder
+        self.encoder = model
+        return model
 
     def build_lhcdata_model(self):
         D = self.D
@@ -186,24 +188,32 @@ class VariationalAutoencoderModel():
 
 
     def build_lhcdata_model_quantised(self):
-        D = self.D
-
+        model = Sequential()
+        
         if self.mode == 'ordered':
-            in_regression = Input(shape=(D,), name='in_regression')
-            inputs = in_regression
-
-        x = QDense( self.hidden_layers[0],
-                    kernel_quantizer=quantized_bits(8,0,alpha=1), 
-                    bias_quantizer=quantized_bits(8,0,alpha=1),
-                    activation=quantized_relu(8)      )(inputs)
+            inputs = Input(shape=(self.D,), name='in_regression')
 
 
+        model.add(QDense(self.hidden_layers[0], input_shape=(self.D,), name='fc1',
+                 kernel_quantizer=quantized_bits(6,0,alpha=1), 
+                 bias_quantizer=quantized_bits(6,0,alpha=1),
+                 kernel_initializer='lecun_uniform', 
+                 kernel_regularizer=l1(0.0001))
+                 )
+
+        model.add(QActivation(activation=quantized_relu(6), name='relu1'))
         if len(self.hidden_layers) > 1:
             for i, v in enumerate(self.hidden_layers):
                 if (i > 0):
-                    x = QDense(v,kernel_quantizer=quantized_bits(8,0,alpha=1), 
-                    bias_quantizer=quantized_bits(8,0,alpha=1), 
-                    activation=quantized_relu(8))(x)
+
+                    model.add(QDense(v, name='fc%s' %(str(i+1)),
+                        kernel_quantizer=quantized_bits(6,0,alpha=1), 
+                        bias_quantizer=quantized_bits(6,0,alpha=1),
+                        kernel_initializer='lecun_uniform', 
+                        kernel_regularizer=l1(0.0001))
+                    )
+                    model.add(QActivation(activation=quantized_relu(6),  name='relu%s' %(str(i+1))))
+
         """
         x = Dense(512, activation='elu')(inputs)
         x = Dense(256, activation='elu')(x)
@@ -214,24 +224,99 @@ class VariationalAutoencoderModel():
         
         x = Dense(8, activation='elu')(inputs)
         """
-        z_mean = QDense(self.dim_z,
-        kernel_quantizer=quantized_bits(8,0,alpha=1), 
-        bias_quantizer=quantized_bits(8,0,alpha=1),
-        name='z_mean', activation=None)(x)
-        # instantiate encoder model
-        if self.mode == 'ordered':
-         self.encoder = Model([in_regression], [z_mean], name='encoder')
-
-        self.encoder.compile(optimizer='adam', loss='mean_squared_error')
-        return self.encoder
+        model.add(QDense(self.dim_z, name='fc%s' %(str(i+2)),
+                        kernel_quantizer=quantized_bits(6,0,alpha=1), 
+                        bias_quantizer=quantized_bits(6,0,alpha=1),
+                        kernel_initializer='lecun_uniform', 
+                        kernel_regularizer=l1(0.0001))
+                    )
 
 
-    def train_model(self, train, batch_size=10000,epochs = 5):
+        # # instantiate encoder model
+        # if self.mode == 'ordered':
+        #     self.encoder = Model([in_regression], [z_mean], name='encoder')
+
+        model.compile(optimizer='adam', loss='mean_squared_error')
+        self.encoder = model
+        return model
+
+    # def build_lhcdata_model_quantised(self):
+    #     model = Sequential()
+        
+    #     if self.mode == 'ordered':
+    #         inputs = Input(shape=(self.D,), name='in_regression')
+
+    #     print(self.hidden_layers)
+
+    #     model.add(QDense(self.hidden_layers[0], input_shape=(self.D,), name='fc1',
+    #              kernel_quantizer=quantized_bits(6,0,alpha=1), 
+    #              bias_quantizer=quantized_bits(6,0,alpha=1),
+    #              kernel_initializer='lecun_uniform', 
+    #              kernel_regularizer=l1(0.0001))
+    #              )
+
+    #     model.add(QActivation(activation=quantized_relu(6), name='relu1'))
+    #     if len(self.hidden_layers) > 1:
+    #         for i, v in enumerate(self.hidden_layers):
+    #             if (i > 0):
+    #                 x = QDense(v,kernel_quantizer=quantized_bits(8,0,alpha=1), 
+    #                 bias_quantizer=quantized_bits(8,0,alpha=1), 
+    #                 activation=quantized_relu(8))(x)
+    #                 model.add(QDense(v, name='fc%s' %(str(i+1)),
+    #                     kernel_quantizer=quantized_bits(6,0,alpha=1), 
+    #                     bias_quantizer=quantized_bits(6,0,alpha=1),
+    #                     kernel_initializer='lecun_uniform', 
+    #                     kernel_regularizer=l1(0.0001))
+    #                 )
+    #                 model.add(QActivation(activation=quantized_relu(6),  name='relu%s' %(str(i+1))))
+
+
+
+
+
+
+
+    #     x = QDense( self.hidden_layers[0],
+    #                 kernel_quantizer=quantized_bits(8,0,alpha=1), 
+    #                 bias_quantizer=quantized_bits(8,0,alpha=1),
+    #                 activation=quantized_relu(8)      )(inputs)
+
+
+    #     if len(self.hidden_layers) > 1:
+    #         for i, v in enumerate(self.hidden_layers):
+    #             if (i > 0):
+    #                 x = QDense(v,kernel_quantizer=quantized_bits(8,0,alpha=1), 
+    #                 bias_quantizer=quantized_bits(8,0,alpha=1), 
+    #                 activation=quantized_relu(8))(x)
+    #     """
+    #     x = Dense(512, activation='elu')(inputs)
+    #     x = Dense(256, activation='elu')(x)
+    #     x = Dense(128, activation='elu')(x)
+    #     #
+    #     x = Dense(256, activation='elu')(inputs)
+    #     x = Dense(128, activation='elu')(x)
+        
+    #     x = Dense(8, activation='elu')(inputs)
+    #     """
+    #     z_mean = QDense(self.dim_z,
+    #     kernel_quantizer=quantized_bits(8,0,alpha=1), 
+    #     bias_quantizer=quantized_bits(8,0,alpha=1),
+    #     name='z_mean', activation=None)(x)
+    #     # instantiate encoder model
+    #     if self.mode == 'ordered':
+    #         self.encoder = Model([in_regression], [z_mean], name='encoder')
+
+    #     self.encoder.compile(optimizer='adam', loss='mean_squared_error')
+    #     return self.encoder
+
+
+
+    def train_model(self, train, batch_size=10000,epochs = 1):
 
         earlystopper = EarlyStopping(monitor='loss', patience=50, verbose=0, min_delta=1e-7)
         checkpointer = ModelCheckpoint(self.model_filename, monitor='loss', verbose=1, save_best_only=True)
         reduce_lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience=5, min_lr=0.000000001)
-        tensorboard = TensorBoard(log_dir='tb_logs/' + self.filename)
+        # tensorboard = TensorBoard(log_dir='tb_logs/' + self.filename)
 
         lr = 1e-3
         epoch_num = 0
@@ -252,7 +337,7 @@ class VariationalAutoencoderModel():
             epochs=epochs,
             shuffle=True,
             verbose=1 if self.verbose else 0, 
-            callbacks=[earlystopper, reduce_lr, checkpointer, tensorboard]
+            callbacks=[earlystopper, reduce_lr, checkpointer]
         )
 
     def savemodel(self):
@@ -264,34 +349,48 @@ class VariationalAutoencoderModel():
         self.model.load_weights(weight_filename)
 
     def evaluate_radius_max(self, train_data, batch_size):
-        logger.info('evaluating radius max')
-
+        logger.info('Entering radius max function')
         if self.use_hls4ml:
+
+
             logger.info('using hls4ml to evaluate radius max')
+
+
+
             hls4ml.model.optimizer.OutputRoundingSaturationMode.layers = ['Activation']
             hls4ml.model.optimizer.OutputRoundingSaturationMode.rounding_mode = 'AP_RND'
             hls4ml.model.optimizer.OutputRoundingSaturationMode.saturation_mode = 'AP_SAT'
-            config = hls4ml.utils.config_from_keras_model(self.encoder, granularity='name')
+            config = hls4ml.utils.config_from_keras_model(self.model,granularity='name')
             # config['LayerName']['softmax']['exp_table_t'] = 'ap_fixed<18,8>'
             # config['LayerName']['softmax']['inv_table_t'] = 'ap_fixed<18,4>'
+
+
             print("-----------------------------------")
             plotting.print_dict(config)
             print("-----------------------------------")
-            if not os.path.exists(self.modeldir+"/hls3ml_models"):
-                os.makedirs(self.modeldir+"/hls3ml_models")
-            hls_model = hls4ml.converters.convert_from_keras_model(self.encoder,
+            self.hls4ml_model_folder = self.modeldir+"/hls4ml_models/"+self.filename
+            if not os.path.exists(self.hls4ml_model_folder):
+                os.makedirs(self.hls4ml_model_folder)
+
+
+            logger.info('making Config convert from keras model')
+
+            hls_model = hls4ml.converters.convert_from_keras_model(self.model,
                                                        hls_config=config,
-                                                       output_dir=self.modeldir+"/hls3ml_models",
+                                                       output_dir=self.hls4ml_model_folder,
                                                        part='xcu250-figd2104-2L-e')
+
+            logger.info('compiling the hls_model')
             hls_model.compile()
             self.hls4ml_model = hls_model
-            latent_space_hls = hls_model.predict(np.ascontiguousarray(train_data))
+
+            logger.info('predicting..')
+            latent_space_hls = hls_model.predict(train_data)
+            logger.info('getting training scores..')
             train_scores = get_R(latent_space_hls - self.MSE(self.c, latent_space_hls.shape[0], self.dim_z))
             print(train_scores)
             max_radius = np.max(train_scores)
             return max_radius
-
-
 
 
         else:
@@ -312,8 +411,11 @@ class VariationalAutoencoderModel():
 
 
         if self.use_hls4ml:
+            logger.info('using hls4ml: to evaluate radius')
+
             latent_space_hls = self.hls4ml_model.predict(np.ascontiguousarray(data))
 
+            logger.info('using hls4ml: getting scores')
 
             scores = get_R(latent_space_hls - self.MSE(self.c, latent_space_hls.shape[0], self.dim_z))
 
