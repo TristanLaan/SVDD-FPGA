@@ -110,11 +110,11 @@ def main(Flags):
     if not os.path.exists('results'):
         os.makedirs('results')
 
-    if not os.path.exists('results/scores/'):
-        os.makedirs('results/scores/')
+    # if not os.path.exists('results/scores/'):
+    #     os.makedirs('results/scores/')
 
-    if not os.path.exists('results/metrics'):
-        os.makedirs('results/metrics')
+    # if not os.path.exists('results/metrics'):
+    #     os.makedirs('results/metrics')
 
     training_data, testing_data,regression_training,regression_testing,etype_testing,etype_training = utils.preprocessdata(training_filename,testing_filename,Flags)
 
@@ -125,51 +125,21 @@ def main(Flags):
         model = utils.train(dataset_len, data_dim, training_data,model_name, Flags)
         logger.info("finished training")
 
-    if Flags.run:
-        logger.info("starting inference")
-        if mode == 'ordered':
-            data_dim = regression_testing.shape[1]
-            dataset_len = regression_testing.shape[0]
-        utils.test(dataset_len, data_dim, etype_testing, training_data, testing_data, model_name, Flags,model=model)
-        logger.info("finished inference")
+    # if Flags.run:
+    #     logger.info("starting inference")
+    #     if mode == 'ordered':
+    #         data_dim = regression_testing.shape[1]
+    #         dataset_len = regression_testing.shape[0]
+    #     utils.test(dataset_len, data_dim, etype_testing, training_data, testing_data, model_name, Flags,model=model)
+    #     logger.info("finished inference")
 
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser()
 
-    parser.add_argument('--batch', type=int, default=10000, help='Mini batch size')
-    
-    parser.add_argument('--dim', type=int, default=55, help='Latent space dim.')
+    from utils import SVDD_arguments_parser
 
-    parser.add_argument('--hidden_layers', type=str, default='8', help='Number of nodes in hidden layers')   
-   
-    parser.add_argument('--device', type=str, default='cpu', help='type of device cpu or gpu')
+    FLAGS, unparsed = SVDD_arguments_parser()
 
-    parser.add_argument('--plotdata', type=bool, default=False, help='plot the testing data')
-
-    parser.add_argument('--plotdir', type=str, default="plots", help='plotdir')
-
-    parser.add_argument('--quantised', type=bool, default=False, help='quantised')
-
-    parser.add_argument('--modeldir', type=str, default="models_trained", help='model dir')
-
-    parser.add_argument('--resume', type=str, default='False', help='Resume')
-
-    parser.add_argument('--train', type=str, default='False', help='Resume')
-    
-    parser.add_argument('--test', type=str, default='True', help='Resume')
-
-    parser.add_argument('--run', type=bool, default=False, help='Run')
-
-    parser.add_argument('--fixed_target', type=int, default=1)
-
-    parser.add_argument('--mode', type=str, default='ordered')
-
-    parser.add_argument('--iterations', type=int, default=1, help="number of times the inference procedure is repeated")
-
-    parser.add_argument('--precision', type=str, default="float32", help="set precision (default = float32)")
-
-    FLAGS, unparsed = parser.parse_known_args()
    
     main(FLAGS)

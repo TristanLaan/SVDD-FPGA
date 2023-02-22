@@ -9,7 +9,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.losses import mse, binary_crossentropy, categorical_crossentropy, sparse_categorical_crossentropy
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras import backend as K
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard, ReduceLROnPlateau
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from tensorflow.keras import regularizers
 from scipy.stats import multivariate_normal
 from tensorflow.keras.optimizers import Adam
@@ -36,14 +36,6 @@ import h5py
 import hls4ml
 import plotting
 
-
-
-
-########################
-
-
-########################
-
 ################################################################################################################
 ################################################################################################################
 import logging
@@ -56,6 +48,7 @@ ch.setLevel(logging.DEBUG)
 # create formatter
 # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
+import os
 import os.path
 home = os.getcwd()
 
@@ -72,7 +65,7 @@ def get_R(coords, center=None):
 
 
 class VariationalAutoencoderModel():
-    def __init__(self, hidden_layers, filename, D, dataset_len, dim_z, c, mode=None, verbose=False,modeldir="models",quantised=False,hls4ml=False,modelpath=False):
+    def __init__(self, hidden_layers, filename, D, dataset_len, dim_z, c, mode=None, verbose=False,modeldir="models",quantised=False,hls4ml=False,modelpath=False,Nbits=None):
         self.D = D
         self.dataset_len = dataset_len
         self.dim_z = dim_z
@@ -80,16 +73,18 @@ class VariationalAutoencoderModel():
         self.verbose = verbose
         self.hls4ml_model = None
         self.model = None
-
-
-
-        self.model_filename = str(modeldir)+ '/' + filename + '.h5'
+        self.model_filename = filename + '.h5'
         self.modeldir = str(modeldir)
         self.modelpath = modelpath
         self.use_hls4ml = hls4ml
         self.filename = filename
         self.mode = mode
         self.hidden_layers = hidden_layers
+        self.bits= 16
+        if Nbits:
+            self.bits= Nbits
+
+        logger.info("using hls4ml wrapper: %s" % (self.use_hls4ml))
 
         # if hls4ml and quantised:
 
@@ -133,12 +128,9 @@ class VariationalAutoencoderModel():
         from qkeras.utils import _add_supported_quantized_objects
         co = {}
         _add_supported_quantized_objects(co)
+        print(self.modelpath)
         model = load_model(self.modelpath, custom_objects=co)
         model.summary()
-        # # instantiate encoder model
-        # if self.mode == 'ordered':
-        #     self.encoder = Model(model.input, model.layers[-1].output, name='encoder')
-        # self.encoder.compile(optimizer='adam', loss='mean_squared_error')
 
         self.encoder = model
         return model
@@ -147,12 +139,6 @@ class VariationalAutoencoderModel():
         model = load_model(self.modelpath)
         logger.debug('loaded model with summary: %s' %(self.modelpath))
         model.summary()
-
-
-        # if self.mode == 'ordered':
-        #     self.encoder = Model(model.input, model.layers[-1].output, name='encoder')
-        # self.encoder.compile(optimizer='adam', loss='mean_squared_error')
-
 
         self.encoder = model
         return model
@@ -195,24 +181,24 @@ class VariationalAutoencoderModel():
 
 
         model.add(QDense(self.hidden_layers[0], input_shape=(self.D,), name='fc1',
-                 kernel_quantizer=quantized_bits(6,0,alpha=1), 
-                 bias_quantizer=quantized_bits(6,0,alpha=1),
+                 kernel_quantizer=quantized_bits(self.bits,0,alpha=1), 
+                 bias_quantizer=quantized_bits(self.bits,0,alpha=1),
                  kernel_initializer='lecun_uniform', 
                  kernel_regularizer=l1(0.0001))
                  )
 
-        model.add(QActivation(activation=quantized_relu(6), name='relu1'))
+        model.add(QActivation(activation=quantized_relu(self.bits), name='relu1'))
         if len(self.hidden_layers) > 1:
             for i, v in enumerate(self.hidden_layers):
                 if (i > 0):
 
                     model.add(QDense(v, name='fc%s' %(str(i+1)),
-                        kernel_quantizer=quantized_bits(6,0,alpha=1), 
-                        bias_quantizer=quantized_bits(6,0,alpha=1),
+                        kernel_quantizer=quantized_bits(self.bits,0,alpha=1), 
+                        bias_quantizer=quantized_bits(self.bits,0,alpha=1),
                         kernel_initializer='lecun_uniform', 
                         kernel_regularizer=l1(0.0001))
                     )
-                    model.add(QActivation(activation=quantized_relu(6),  name='relu%s' %(str(i+1))))
+                    model.add(QActivation(activation=quantized_relu(self.bits),  name='relu%s' %(str(i+1))))
 
         """
         x = Dense(512, activation='elu')(inputs)
@@ -224,9 +210,10 @@ class VariationalAutoencoderModel():
         
         x = Dense(8, activation='elu')(inputs)
         """
+        i = len(self.hidden_layers) + 1
         model.add(QDense(self.dim_z, name='fc%s' %(str(i+2)),
-                        kernel_quantizer=quantized_bits(6,0,alpha=1), 
-                        bias_quantizer=quantized_bits(6,0,alpha=1),
+                        kernel_quantizer=quantized_bits(self.bits,0,alpha=1), 
+                        bias_quantizer=quantized_bits(self.bits,0,alpha=1),
                         kernel_initializer='lecun_uniform', 
                         kernel_regularizer=l1(0.0001))
                     )
@@ -309,12 +296,20 @@ class VariationalAutoencoderModel():
     #     self.encoder.compile(optimizer='adam', loss='mean_squared_error')
     #     return self.encoder
 
+    def savemodel(self,filepath):
+        logger.info("saving model %s" % (filepath))
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        self.model.save(filepath)
 
-
-    def train_model(self, train, batch_size=10000,epochs = 1):
-
+    def train_model(self, train, batch_size=10000,epochs = 5):
+        outdir = '%s/savedmodels' %(self.modeldir)
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
+        outpath = os.path.join(outdir,self.model_filename)
+        print(outpath)
         earlystopper = EarlyStopping(monitor='loss', patience=50, verbose=0, min_delta=1e-7)
-        checkpointer = ModelCheckpoint(self.model_filename, monitor='loss', verbose=1, save_best_only=True)
+        # checkpointer = ModelCheckpoint(filepath=outpath, monitor='loss', verbose=1,save_weights_only=False, save_best_only=True)
         reduce_lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience=5, min_lr=0.000000001)
         # tensorboard = TensorBoard(log_dir='tb_logs/' + self.filename)
 
@@ -337,41 +332,53 @@ class VariationalAutoencoderModel():
             epochs=epochs,
             shuffle=True,
             verbose=1 if self.verbose else 0, 
-            callbacks=[earlystopper, reduce_lr, checkpointer]
+            callbacks=[earlystopper, reduce_lr]
         )
+        self.savemodel(outpath)
 
-    def savemodel(self):
-        if not os.path.exists('%s/savedmodels' %(self.modeldir)):
-            os.makedirs('%s/savedmodels' %(self.modeldir))
-        self.model.save('%s/savedmodels/%s.h5' %(self.modeldir,self.filename))
+
 
     def load_weights(self, weight_filename):
         self.model.load_weights(weight_filename)
 
     def evaluate_radius_max(self, train_data, batch_size):
         logger.info('Entering radius max function')
+        
+        
         if self.use_hls4ml:
-
-
             logger.info('using hls4ml to evaluate radius max')
 
-
-
-            hls4ml.model.optimizer.OutputRoundingSaturationMode.layers = ['Activation']
-            hls4ml.model.optimizer.OutputRoundingSaturationMode.rounding_mode = 'AP_RND'
-            hls4ml.model.optimizer.OutputRoundingSaturationMode.saturation_mode = 'AP_SAT'
+            # hls4ml.model.optimizer.OutputRoundingSaturationMode.layers = ['Activation']
+            # hls4ml.model.optimizer.OutputRoundingSaturationMode.rounding_mode = 'AP_RND'
+            # hls4ml.model.optimizer.OutputRoundingSaturationMode.saturation_mode = 'AP_SAT'
             config = hls4ml.utils.config_from_keras_model(self.model,granularity='name')
             # config['LayerName']['softmax']['exp_table_t'] = 'ap_fixed<18,8>'
             # config['LayerName']['softmax']['inv_table_t'] = 'ap_fixed<18,4>'
+            config['Model']['Precision'] = 'ap_fixed<32,6>'
 
+            # config['LayerName']['dense']['Precision']['weight'] = 'ap_fixed<32,6>'
+            # config['LayerName']['dense']['Precision']['result'] = 'ap_fixed<32,6>'
+            # config['LayerName']['dense']['Precision']['bias'] = 'ap_fixed<32,6>'
+            
+            # config['LayerName']['dense_1_elu']['Precision'] = 'ap_fixed<32,6>'
+            # config['LayerName']['dense_1_elu']['table_t'] = 'ap_fixed<32,6>'
 
-            print("-----------------------------------")
+            # config['LayerName']['dense_1']['Precision']['weight'] = 'ap_fixed<32,6>'
+            # config['LayerName']['dense_1']['Precision']['result'] = 'ap_fixed<32,6>'
+            # config['LayerName']['dense_1']['Precision']['bias'] = 'ap_fixed<32,6>'
+            
+            # config['LayerName']['dense_2_elu']['Precision'] = 'ap_fixed<32,6>'
+            # config['LayerName']['dense_2_elu']['table_t'] = 'ap_fixed<32,6>'
+            
+            # config['LayerName']['dense_2']['Precision']['weight'] = 'ap_fixed<32,6>'
+            # config['LayerName']['dense_2']['Precision']['result'] = 'ap_fixed<32,6>'
+            # config['LayerName']['dense_2']['Precision']['bias'] = 'ap_fixed<32,6>'
+            # print("-----------------------------------")
             plotting.print_dict(config)
             print("-----------------------------------")
             self.hls4ml_model_folder = self.modeldir+"/hls4ml_models/"+self.filename
             if not os.path.exists(self.hls4ml_model_folder):
                 os.makedirs(self.hls4ml_model_folder)
-
 
             logger.info('making Config convert from keras model')
 
@@ -380,30 +387,33 @@ class VariationalAutoencoderModel():
                                                        output_dir=self.hls4ml_model_folder,
                                                        part='xcu250-figd2104-2L-e')
 
+            hls4ml.utils.plot_model(hls_model, show_shapes=True, show_precision=True, to_file=self.hls4ml_model_folder+"/plot.pdf")
             logger.info('compiling the hls_model')
             hls_model.compile()
             self.hls4ml_model = hls_model
 
             logger.info('predicting..')
             latent_space_hls = hls_model.predict(train_data)
+            latent_space = latent_space_hls
             logger.info('getting training scores..')
             train_scores = get_R(latent_space_hls - self.MSE(self.c, latent_space_hls.shape[0], self.dim_z))
-            print(train_scores)
             max_radius = np.max(train_scores)
-            return max_radius
+
 
 
         else:
-            latent_space = self.encoder.predict(train_data, batch_size=batch_size, verbose=self.verbose)
-            print(latent_space)
+            logger.info('using keras to evaluate radius max')
 
-            # logger.debug("laten space type %s" % (print(latent_space[0][0].type)))
+            latent_space = self.encoder.predict(train_data, batch_size=batch_size, verbose=self.verbose)
+
+
 
             train_scores = get_R(latent_space - self.MSE(self.c, latent_space.shape[0], self.dim_z))
-            print(train_scores)
             max_radius = np.max(train_scores)
 
-            return max_radius
+        logger.info('previewing training latent space..')
+        print(latent_space)
+        return max_radius
 
 
     def evaluate_radius(self, data, r_max, batch_size):
@@ -426,6 +436,7 @@ class VariationalAutoencoderModel():
         else:
 
 
+            logger.info('using keras to evaluate radius')
 
             latent_space = self.encoder.predict(data, batch_size=batch_size, verbose=self.verbose)
 
