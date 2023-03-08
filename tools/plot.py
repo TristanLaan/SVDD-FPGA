@@ -150,7 +150,7 @@ def makeROCs(Flags):
     # if Flags.hls4ml:
     #     outputdir = os.path.join("figures","hls4ml_wrapper",Flags.modeldir,Flags.plotdir)
     # else:
-    outputdir = os.path.join("figures",Flags.modeldir,Flags.plotdir)
+    outputdir = os.path.join("figures",Flags.plotdir)
 
     print(outputdir)
 
@@ -181,13 +181,14 @@ def makeROCs(Flags):
             #     outdirROCs = os.path.join('results',Flags.modeldir,"hls4ml_wrapper",'ROCs',model,key)
             #     outdirsmetrics = os.path.join('results',Flags.modeldir,"hls4ml_wrapper",'metrics',model,key)
             # else:
-            outdirscores = os.path.join('results',Flags.modeldir,'scores',model,key)
+            outdirscores = os.path.join('results',Flags.modeldir[k],'scores',model,key)
 
-            outdirROCs = os.path.join('results',Flags.modeldir,'ROCs',model,key)
+            outdirROCs = os.path.join('results',Flags.modeldir[k],'ROCs',model,key)
 
-            outdirsmetrics = os.path.join('results',Flags.modeldir,'metrics',model,key)
+            outdirsmetrics = os.path.join('results',Flags.modeldir[k],'metrics',model,key)
 
-
+            AUCdir = os.path.join('results',Flags.modeldir[k],'metrics',model,key)
+            AUC = round(float(np.loadtxt(os.path.join(AUCdir,'AUC.txt'))),2)
             
             logger.info("loading %s" % (os.path.join(outdirROCs,'fpr.txt')))
             logger.info("loading %s" % (os.path.join(outdirROCs,'tpr.txt')))
@@ -197,9 +198,9 @@ def makeROCs(Flags):
             print(tpr)
             print(fpr)
 
-            roc_label = "SVDD ft %s zdim %s" % (model.split("_")[-2],model.split("_")[-1])
-            plt.plot( tpr,fpr, color = cc[k]["color"],linestyle="--", linewidth=2, label=roc_label)
-
+            # roc_label = "SVDD ft %s zdim %s" % (model.split("_")[-2],model.split("_")[-1])
+            # if 
+            plt.plot( tpr,fpr, color = cc[k]["color"],linestyle="--", linewidth=2, label=Flags.labels[k] + ", AUC: %s" % str(AUC))
 
 
         plt.legend(loc="best")
@@ -218,6 +219,83 @@ def makeROCs(Flags):
         plt.savefig(os.path.join(outputdir,"%s_ROC_lin.png" % (key)))
         plt.clf()
 
+def makeAUC(Flags):
+    logger.info("in makeAUC")
+
+    plt.rcParams["figure.figsize"] = (10,6)
+    # if Flags.hls4ml:
+    #     outputdir = os.path.join("figures","hls4ml_wrapper",Flags.modeldir,Flags.plotdir)
+    # else:
+    outputdir = os.path.join("figures",Flags.plotdir)
+
+    print(outputdir)
+    print(Flags.modeldir)
+    print(Flags.model)
+
+
+    if not os.path.exists(outputdir):
+        os.makedirs(outputdir)
+        logger.info("made outputdir")
+    plt.ion()
+    plt.figure()
+    logger.info("made figure")
+
+
+    for i,key in enumerate(sgn_dict):
+        # plt.plot([0,1],[0,1], 'k--')
+        plt.yscale('log')
+
+        plt.grid(axis='x', color='0.95')
+        plt.grid(axis='y', color='0.95')
+        x = []
+        y = []
+        labels = []
+
+
+        for k, model in enumerate(Flags.model):
+            logger.info("plotting: %s" % model)
+            logger.info("signal: %s" % key)
+
+
+            AUCdir = os.path.join('results',Flags.modeldir[k],'metrics',model,key)
+            if Flags.refmodeldir:
+                refAUCdir = os.path.join('results',Flags.refmodeldir,'metrics',model,key)
+
+
+            refAUC = np.loadtxt(os.path.join(refAUCdir,'AUC.txt'))
+            AUC = np.loadtxt(os.path.join(AUCdir,'AUC.txt'))
+            print(refAUC)
+            print(AUC)
+            print(Flags.labels[k])
+            x.append(k+1)
+            labels.append(Flags.labels[k])
+            if Flags.refmodeldir:
+                AUC = float(AUC)/float(refAUC)
+                print(AUC)
+            y.append(float(AUC))
+
+
+        print(x,y)
+        plt.plot( x,y, color = cc[k]["color"],linestyle="--", linewidth=2)
+        plt.xticks(x, labels,rotation = -45)
+
+        plt.legend(loc="best")
+        plt.title("AUC %s" % (key ))
+
+        plt.ylabel("AUC")
+        plt.xlabel("Model parameters")
+
+
+        logger.info("saving %s" % (os.path.join(outputdir,"%s_AUC.png" % (key))))
+
+        plt.savefig(os.path.join(outputdir,"%s_AUC.png" % (key)))
+        plt.yscale('linear')
+        plt.ylim([-0.05, 1.05])
+
+        plt.savefig(os.path.join(outputdir,"%s_AUC.png" % (key)))
+        plt.clf()
+
+
 
 def main(Flags):
     logger.info("in main")
@@ -229,8 +307,23 @@ def main(Flags):
         os.makedirs('figures')
         logger.info("made dir: figures")
 
+    if len(Flags.modeldir) != len(Flags.model):
+        print("give the same amount of models as modeldirs")
+        logger.info("number of modeldirs %s" %(len(Flags.modeldir)) )
+
+        return
+    if len(Flags.labels) != len(Flags.model):
+        print("give the same amount of models as labels")
+        logger.info("number of labels %s" %(len(Flags.labels)) )
+        return
+
+
+
     if Flags.make_roc_plots == 'True':
         makeROCs(Flags)
+    if Flags.AUC == 'True':
+        makeAUC(Flags)
+
     logger.info("Done")
 
 
@@ -241,17 +334,24 @@ if __name__ == '__main__':
 
     parser.add_argument('--mode', type=str, default='ordered', help='Type of encoding')
 
-    parser.add_argument('-m','--model', action='append', help='<Required> Set flag', required=True)
+    parser.add_argument('--refmodel', type=str, default='False', help='Merge all the scores to a csv file for plotting')
+    parser.add_argument('--refmodeldir', type=str, default='False', help='Merge all the scores to a csv file for plotting')
+
+    parser.add_argument('--model', action='append', help='<Required> Set flag', required=True)
+
+    parser.add_argument('--labels', action='append', help='<Required> Set flag', required=True)
 
     parser.add_argument('--plotdir', type=str, default="plots", help='plotdir')
 
-    parser.add_argument('--modeldir', type=str, default="models_trained", help='model dir')
+    parser.add_argument('-d','--modeldir', action='append', help='<Required> Set flag', required=True)
 
     parser.add_argument('--convert_to_csv', type=str, default='True', help='Merge all the scores to a csv file for plotting')
 
+    parser.add_argument('--AUC', type=str, default='False', help='Merge all the scores to a csv file for plotting')
+
     parser.add_argument('--make_box_plots', type=str, default='True', help='Make box and whisker plots')
 
-    parser.add_argument('--make_roc_plots', type=str, default='True', help='Make box and whisker plots')
+    parser.add_argument('--make_roc_plots', type=str, default='False', help='Make box and whisker plots')
 
     parser.add_argument('--make_combination_plots', type=str, default='False', help='Make scores combinations plots')
 
@@ -263,8 +363,6 @@ if __name__ == '__main__':
 
 
     Flags, unparsed = parser.parse_known_args()
-
-    #to csv
     main(Flags) 
 
     

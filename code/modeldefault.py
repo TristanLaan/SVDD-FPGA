@@ -17,6 +17,7 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.regularizers import l1
 
+import yaml
 
 from qkeras.qlayers import QDense, QActivation
 from qkeras.quantizers import quantized_bits, quantized_relu
@@ -65,7 +66,7 @@ def get_R(coords, center=None):
 
 
 class VariationalAutoencoderModel():
-    def __init__(self, hidden_layers, filename, D, dataset_len, dim_z, c, mode=None, verbose=False,modeldir="models",quantised=False,hls4ml=False,modelpath=False,Nbits=None):
+    def __init__(self, hidden_layers, filename, D, dataset_len, dim_z, c, mode=None, verbose=False,modeldir="models",quantised=False,hls4ml=False,modelpath=False,ap_fixed_width=32,ap_fixed_int=6):
         self.D = D
         self.dataset_len = dataset_len
         self.dim_z = dim_z
@@ -73,6 +74,9 @@ class VariationalAutoencoderModel():
         self.verbose = verbose
         self.hls4ml_model = None
         self.model = None
+        self.ap_fixed_width = ap_fixed_width
+        self.ap_fixed_int = ap_fixed_int
+
         self.model_filename = filename + '.h5'
         self.modeldir = str(modeldir)
         self.modelpath = modelpath
@@ -80,9 +84,7 @@ class VariationalAutoencoderModel():
         self.filename = filename
         self.mode = mode
         self.hidden_layers = hidden_layers
-        self.bits= 16
-        if Nbits:
-            self.bits= Nbits
+
 
         logger.info("using hls4ml wrapper: %s" % (self.use_hls4ml))
 
@@ -354,29 +356,53 @@ class VariationalAutoencoderModel():
             config = hls4ml.utils.config_from_keras_model(self.model,granularity='name')
             # config['LayerName']['softmax']['exp_table_t'] = 'ap_fixed<18,8>'
             # config['LayerName']['softmax']['inv_table_t'] = 'ap_fixed<18,4>'
-            config['Model']['Precision'] = 'ap_fixed<32,6>'
+            ap_fixed = "<" + str(self.ap_fixed_width)+","+ str(self.ap_fixed_int) + ">"
+            config['Model']['Precision'] = 'ap_fixed' + ap_fixed
+            # plotting.print_dict(config)
+            config.pop('LayerName')
 
-            # config['LayerName']['dense']['Precision']['weight'] = 'ap_fixed<32,6>'
-            # config['LayerName']['dense']['Precision']['result'] = 'ap_fixed<32,6>'
-            # config['LayerName']['dense']['Precision']['bias'] = 'ap_fixed<32,6>'
-            
-            # config['LayerName']['dense_1_elu']['Precision'] = 'ap_fixed<32,6>'
-            # config['LayerName']['dense_1_elu']['table_t'] = 'ap_fixed<32,6>'
 
-            # config['LayerName']['dense_1']['Precision']['weight'] = 'ap_fixed<32,6>'
-            # config['LayerName']['dense_1']['Precision']['result'] = 'ap_fixed<32,6>'
-            # config['LayerName']['dense_1']['Precision']['bias'] = 'ap_fixed<32,6>'
-            
-            # config['LayerName']['dense_2_elu']['Precision'] = 'ap_fixed<32,6>'
-            # config['LayerName']['dense_2_elu']['table_t'] = 'ap_fixed<32,6>'
-            
-            # config['LayerName']['dense_2']['Precision']['weight'] = 'ap_fixed<32,6>'
-            # config['LayerName']['dense_2']['Precision']['result'] = 'ap_fixed<32,6>'
-            # config['LayerName']['dense_2']['Precision']['bias'] = 'ap_fixed<32,6>'
-            # print("-----------------------------------")
+            # config['LayerName']['in_regression']['Precision']['result'] = 'ap_fixed' + ap_fixed
+
+            # config['LayerName']['dense']['Precision']['weight'] = 'ap_fixed' + ap_fixed
+            # config['LayerName']['dense']['Precision']['result'] = 'ap_fixed' + ap_fixed
+            # config['LayerName']['dense']['Precision']['bias'] = 'ap_fixed' + ap_fixed
+
+            # config['LayerName']['dense_elu']['Precision'] = 'ap_fixed' + ap_fixed
+            # config['LayerName']['dense_elu']['table_t']= 'ap_fixed' + ap_fixed
+
+            # config['LayerName']['dense_1']['Precision']['weight'] = 'ap_fixed' + ap_fixed
+            # config['LayerName']['dense_1']['Precision']['result'] = 'ap_fixed' + ap_fixed
+            # config['LayerName']['dense_1']['Precision']['bias'] = 'ap_fixed' + ap_fixed
+
+            # config['LayerName']['dense_1_elu']['Precision'] = 'ap_fixed' + ap_fixed
+            # config['LayerName']['dense_1_elu']['table_t'] = 'ap_fixed' + ap_fixed
+
+            # config['LayerName']['dense_2']['Precision']['weight'] = 'ap_fixed' + ap_fixed
+            # config['LayerName']['dense_2']['Precision']['result'] = 'ap_fixed' + ap_fixed
+            # config['LayerName']['dense_2']['Precision']['bias'] = 'ap_fixed' + ap_fixed
+
+            # config['LayerName']['dense_2_elu']['Precision'] = 'ap_fixed' + ap_fixed
+            # config['LayerName']['dense_2_elu']['table_t'] = 'ap_fixed' + ap_fixed
+
+            # config['LayerName']['z_mean']['Precision']['weight'] = 'ap_fixed' + ap_fixed
+            # config['LayerName']['z_mean']['Precision']['result'] = 'ap_fixed' + ap_fixed
+            # config['LayerName']['z_mean']['Precision']['bias'] = 'ap_fixed' + ap_fixed
+
+            # config['LayerName']['z_mean_linear']['Precision'] = 'ap_fixed' + ap_fixed
+            # config['LayerName']['z_mean_linear']['table_t']= 'ap_fixed' + ap_fixed
+
+
             plotting.print_dict(config)
+            
             print("-----------------------------------")
-            self.hls4ml_model_folder = self.modeldir+"/hls4ml_models/"+self.filename
+            self.hls4ml_model_folder = self.modeldir+"/hls4ml_models" + "_" + str(self.ap_fixed_width)+"_"+ str(self.ap_fixed_int) +  "/"+self.filename
+            if not os.path.exists(self.modeldir+"/hls4ml_models" + "_" + str(self.ap_fixed_width)+"_"+ str(self.ap_fixed_int)):
+                os.makedirs(self.modeldir+"/hls4ml_models" + "_" + str(self.ap_fixed_width)+"_"+ str(self.ap_fixed_int))
+            with open(self.modeldir+"/hls4ml_models" + "_" + str(self.ap_fixed_width)+"_"+ str(self.ap_fixed_int) +"/hlsmodel.yml", 'w') as file:
+                documents = yaml.dump(config, file)
+
+            print(self.hls4ml_model_folder)
             if not os.path.exists(self.hls4ml_model_folder):
                 os.makedirs(self.hls4ml_model_folder)
 
@@ -434,7 +460,6 @@ class VariationalAutoencoderModel():
             return scores_r
 
         else:
-
 
             logger.info('using keras to evaluate radius')
 

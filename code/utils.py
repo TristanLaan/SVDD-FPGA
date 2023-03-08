@@ -71,7 +71,9 @@ def SVDD_arguments_parser():
     
     parser.add_argument('--dim', type=int, default=55, help='Latent space dim.')
     
-    parser.add_argument('--ap_fixed', type=str, default="<32,6>", help='ap_fixed<X,X>')
+    parser.add_argument('--ap_fixed_width', type=int, default=32, help='ap_fixed<X,X>')
+
+    parser.add_argument('--ap_fixed_int', type=int, default=6, help='ap_fixed<X,X>')
 
     parser.add_argument('--hidden_layers', type=str, default="512 256 128", help='Number of nodes in hidden layers')   
 
@@ -86,8 +88,6 @@ def SVDD_arguments_parser():
     parser.add_argument('--modeldir', type=str, default="models_trained", help='model dir')
     
     parser.add_argument('--inmodeldir', type=str, default="", help='in model dir')
-
-    parser.add_argument('--outmodeldir', type=str, default="", help='in model dir')
 
     parser.add_argument('--resume', type=bool, default=False, help='Resume')
 
@@ -110,8 +110,6 @@ def SVDD_arguments_parser():
     parser.add_argument('--maxEvents', type=int, default=-1, help="Set the number of events to run over, -1 is all events")
 
     parser.add_argument('--epochs', type=int, default=1, help="Set the number of epochs")
-
-    parser.add_argument('--Nbits', type=int, default=16, help="Set the number of bits")
 
     FLAGS, unparsed = parser.parse_known_args()
 
@@ -187,7 +185,7 @@ def train(dataset_len, data_dim, training_data,model_name, Flags):
         sess = tf.compat.v1.Session()
         tf.compat.v1.keras.backend.set_session(sess)
 
-        model = modeldefault.VariationalAutoencoderModel(hl_int_list,model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,modeldir=Flags.modeldir,quantised=Flags.quantised,Nbits=Flags.Nbits)
+        model = modeldefault.VariationalAutoencoderModel(hl_int_list,model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,modeldir=Flags.modeldir,quantised=Flags.quantised,ap_fixed_width=Flags._width,ap_fixed_int=Flags.ap_fixed_int)
         model.train_model(training_data,epochs=Flags.epochs)
 
 
@@ -220,9 +218,9 @@ def test(dataset_len, data_dim, etype_testing, training_data, testing_data, mode
         if not model:
             #create empty SVDD model and load weights
             if modelpath:
-                model = modeldefault.VariationalAutoencoderModel(hl_int_list, model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,quantised=Flags.quantised,hls4ml=Flags.hls4ml,modeldir=Flags.modeldir,modelpath=modelpath,Nbits=Flags.Nbits)
+                model = modeldefault.VariationalAutoencoderModel(hl_int_list, model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,quantised=Flags.quantised,hls4ml=Flags.hls4ml,modeldir=Flags.modeldir,modelpath=modelpath,ap_fixed_width=Flags.ap_fixed_width,ap_fixed_int=Flags.ap_fixed_int)
             else:
-                model = modeldefault.VariationalAutoencoderModel(hl_int_list, model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,quantised=Flags.quantised,hls4ml=Flags.hls4ml,modeldir=Flags.modeldir,Nbits=Flags.Nbits)
+                model = modeldefault.VariationalAutoencoderModel(hl_int_list, model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,quantised=Flags.quantised,hls4ml=Flags.hls4ml,modeldir=Flags.modeldir,ap_fixed_width=Flags.ap_fixed_width,ap_fixed_int=Flags.ap_fixed_int)
 
         #Evaluate radius for training with output r_max
         training_data = shuffle(training_data)
@@ -305,9 +303,16 @@ def test(dataset_len, data_dim, etype_testing, training_data, testing_data, mode
             #     outdirROCs = os.path.join('results',Flags.modeldir,"hls4ml_wrapper",'ROCs',model_name,key)
             #     outdirsmetrics = os.path.join('results',Flags.modeldir,"hls4ml_wrapper",'metrics',model_name,key)
             # else:
-            outdirscores = os.path.join('results',Flags.modeldir,'scores',model_name,key)
-            outdirROCs = os.path.join('results',Flags.modeldir,'ROCs',model_name,key)
-            outdirsmetrics = os.path.join('results',Flags.modeldir,'metrics',model_name,key)
+
+
+
+
+
+            modeldir = Flags.modeldir + "_" + str(Flags.ap_fixed_width)+"_"+ str(Flags.ap_fixed_int)
+            
+            outdirscores = os.path.join('results',modeldir,'scores',model_name,key)
+            outdirROCs = os.path.join('results',modeldir,'ROCs',model_name,key)
+            outdirsmetrics = os.path.join('results',modeldir,'metrics',model_name,key)
 
 
             if not os.path.exists(outdirscores):

@@ -114,7 +114,6 @@ def main(Flags):
 
 
     modelpath = os.path.join(home,Flags.modeldir,"savedmodels",model_name + '.h5')
-    # outmodelpath = os.path.join(home,Flags.outmodeldir,"savedmodels",model_name + '.h5')
 
 
     logger.info("starting inference")
