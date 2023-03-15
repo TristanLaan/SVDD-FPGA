@@ -66,7 +66,7 @@ def get_R(coords, center=None):
 
 
 class VariationalAutoencoderModel():
-    def __init__(self, hidden_layers, filename, D, dataset_len, dim_z, c, mode=None, verbose=False,modeldir="models",quantised=False,hls4ml=False,modelpath=False,ap_fixed_width=32,ap_fixed_int=6):
+    def __init__(self, hidden_layers, filename, D, dataset_len, dim_z, c, mode=None, verbose=False,modeldir="models",quantised=False,hls4ml=False,modelpath=False,ap_fixed_width=32,ap_fixed_int=6,Flags = None):
         self.D = D
         self.dataset_len = dataset_len
         self.dim_z = dim_z
@@ -76,6 +76,8 @@ class VariationalAutoencoderModel():
         self.model = None
         self.ap_fixed_width = ap_fixed_width
         self.ap_fixed_int = ap_fixed_int
+        if Flags:
+            self.Flags = Flags
 
         self.model_filename = filename + '.h5'
         self.modeldir = str(modeldir)
@@ -403,10 +405,11 @@ class VariationalAutoencoderModel():
                 documents = yaml.dump(config, file)
 
             print(self.hls4ml_model_folder)
-            if not os.path.exists(self.hls4ml_model_folder):
+            if os.path.exists(self.hls4ml_model_folder):
+                os.system("rm -r %s" % (self.hls4ml_model_folder))
                 os.makedirs(self.hls4ml_model_folder)
-
-            logger.info('making Config convert from keras model')
+            else:
+                os.makedirs(self.hls4ml_model_folder)
 
             hls_model = hls4ml.converters.convert_from_keras_model(self.model,
                                                        hls_config=config,
@@ -417,6 +420,13 @@ class VariationalAutoencoderModel():
             logger.info('compiling the hls_model')
             hls_model.compile()
             self.hls4ml_model = hls_model
+
+
+
+            if self.Flags.build:
+                logger.info('building the hls_model')
+                hls_model.build(csim=False)
+                return
 
             logger.info('predicting..')
             latent_space_hls = hls_model.predict(train_data)

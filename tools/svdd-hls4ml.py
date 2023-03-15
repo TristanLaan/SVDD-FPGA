@@ -111,8 +111,6 @@ def main(Flags):
 
 
     training_data, testing_data,regression_training,regression_testing,etype_testing,etype_training = utils.preprocessdata(training_filename,testing_filename,Flags)
-
-
     modelpath = os.path.join(home,Flags.modeldir,"savedmodels",model_name + '.h5')
 
 
@@ -132,5 +130,6 @@ if __name__ == '__main__':
 
     FLAGS, unparsed = SVDD_arguments_parser()
 
-   
+    os.environ['PATH'] = '/opt/xilinx/tools/Vivado/2022.2/bin/:' + os.environ['PATH']
+    print(os.environ['PATH'])
     main(FLAGS)
