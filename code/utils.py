@@ -105,6 +105,8 @@ def SVDD_arguments_parser():
 
     parser.add_argument('--mode', type=str, default='ordered')
 
+    parser.add_argument('--build', type=bool, default=False, help='build model')
+
     parser.add_argument('--iterations', type=int, default=1, help="number of times the inference procedure is repeated")
 
     parser.add_argument('--precision', type=str, default="float32", help="set precision (default = float32)")
@@ -187,7 +189,7 @@ def train(dataset_len, data_dim, training_data,model_name, Flags):
         sess = tf.compat.v1.Session()
         tf.compat.v1.keras.backend.set_session(sess)
 
-        model = modeldefault.VariationalAutoencoderModel(hl_int_list,model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,modeldir=Flags.modeldir,quantised=Flags.quantised,ap_fixed_width=Flags.ap_fixed_width,ap_fixed_int=Flags.ap_fixed_int,Flags = Flags)
+        model = modeldefault.VariationalAutoencoderModel(hl_int_list,model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,modeldir=Flags.modeldir,quantised=Flags.quantised,ap_fixed_width=Flags._width,ap_fixed_int=Flags.ap_fixed_int, Flags = Flags)
         model.train_model(training_data,epochs=Flags.epochs)
 
 
@@ -222,7 +224,7 @@ def test(dataset_len, data_dim, etype_testing, training_data, testing_data, mode
             if modelpath:
                 model = modeldefault.VariationalAutoencoderModel(hl_int_list, model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,quantised=Flags.quantised,hls4ml=Flags.hls4ml,modeldir=Flags.modeldir,modelpath=modelpath,ap_fixed_width=Flags.ap_fixed_width,ap_fixed_int=Flags.ap_fixed_int,Flags = Flags)
             else:
-                model = modeldefault.VariationalAutoencoderModel(hl_int_list, model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,quantised=Flags.quantised,hls4ml=Flags.hls4ml,modeldir=Flags.modeldir,ap_fixed_width=Flags.ap_fixed_width,ap_fixed_int=Flags.ap_fixed_int,Flags = Flags)
+                model = modeldefault.VariationalAutoencoderModel(hl_int_list, model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,quantised=Flags.quantised,hls4ml=Flags.hls4ml,modeldir=Flags.modeldir,ap_fixed_width=Flags.ap_fixed_width,ap_fixed_int=Flags.ap_fixed_int,Flags= Flags)
 
         #Evaluate radius for training with output r_max
         training_data = shuffle(training_data)

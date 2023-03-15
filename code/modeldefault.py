@@ -67,7 +67,7 @@ def get_R(coords, center=None):
 
 
 class VariationalAutoencoderModel():
-    def __init__(self, hidden_layers, filename, D, dataset_len, dim_z, c, mode=None, verbose=False,modeldir="models",quantised=False,hls4ml=False,modelpath=False,ap_fixed_width=32,ap_fixed_int=6,Flags = ""):
+    def __init__(self, hidden_layers, filename, D, dataset_len, dim_z, c, mode=None, verbose=False,modeldir="models",quantised=False,hls4ml=False,modelpath=False,ap_fixed_width=32,ap_fixed_int=6,Flags = None):
         self.D = D
         self.dataset_len = dataset_len
         self.dim_z = dim_z
@@ -389,8 +389,6 @@ class VariationalAutoencoderModel():
             else:
                 os.makedirs(self.hls4ml_model_folder)
 
-            logger.info('making Config convert from keras model')
-
             hls_model = hls4ml.converters.convert_from_keras_model(self.model,
                                                        hls_config=config,
                                                        output_dir=self.hls4ml_model_folder,
@@ -400,6 +398,13 @@ class VariationalAutoencoderModel():
             logger.info('compiling the hls_model')
             hls_model.compile()
             self.hls4ml_model = hls_model
+
+
+
+            if self.Flags.build:
+                logger.info('building the hls_model')
+                hls_model.build(csim=False)
+                return
 
             logger.info('predicting..')
             latent_space_hls = hls_model.predict(train_data)
