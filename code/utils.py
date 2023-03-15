@@ -189,7 +189,7 @@ def train(dataset_len, data_dim, training_data,model_name, Flags):
         sess = tf.compat.v1.Session()
         tf.compat.v1.keras.backend.set_session(sess)
 
-        model = modeldefault.VariationalAutoencoderModel(hl_int_list,model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,modeldir=Flags.modeldir,quantised=Flags.quantised,ap_fixed_width=Flags._width,ap_fixed_int=Flags.ap_fixed_int, Flags = Flags)
+        model = modeldefault.VariationalAutoencoderModel(hl_int_list,model_name, data_dim, dataset_len, int(dim_z), int(ft), mode=mode, verbose=True,modeldir=Flags.modeldir,quantised=Flags.quantised,ap_fixed_width=Flags.ap_fixed_width,ap_fixed_int=Flags.ap_fixed_int, Flags = Flags)
         model.train_model(training_data,epochs=Flags.epochs)
 
 
