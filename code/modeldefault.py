@@ -338,6 +338,7 @@ class VariationalAutoencoderModel():
             # config['LayerName']['softmax']['inv_table_t'] = 'ap_fixed<18,4>'
             ap_fixed = "<" + str(self.ap_fixed_width)+","+ str(self.ap_fixed_int) + ">"
             config['Model']['Precision'] = 'ap_fixed' + ap_fixed
+            
             # plotting.print_dict(config)
             config.pop('LayerName')
 
@@ -373,6 +374,16 @@ class VariationalAutoencoderModel():
             # config['LayerName']['z_mean_linear']['table_t']= 'ap_fixed' + ap_fixed
 
 
+            if self.Flags.profiling:
+                config['LayerName'] = {}
+                for layer in ["in_regression","dense","dense_elu","dense_1","dense_2","dense_2_elu","z_mean","z_mean_linear"]:
+                    config['LayerName'][layer] = {}
+                    config['LayerName'][layer]['Trace'] = True
+
+
+
+
+
             plotting.print_dict(config)
 
 
@@ -396,8 +407,41 @@ class VariationalAutoencoderModel():
                                                        part='xcvc1902-vsvd1760-2MP-e-S',
                                                        board ="vck5000",
                                                        backend='Vivado',
-                                                       clock_period=500 )  # Filler.
-#xcu250-figd2104-2L-e,
+                                                       clock_period=500,
+                                                       part='xcu250-figd2104-2L-e')
+
+
+
+        # plt.legend(loc="best")
+        # plt.title("ROC SVDD for Signal type %s" % (key ))
+
+        # plt.ylabel("Standard Model Background acceptance")
+        # plt.xlabel(r"%s Signal efficiency" % (sgn_label_dict[key]))
+
+
+        # plt.savefig(os.path.join(outputdir,"%s_ROC_log.png" % (key)))
+        # plt.yscale('linear')
+        # plt.ylim([-0.05, 1.05])
+        # plt.xlim([0, 1.05])
+        # plt.savefig(os.path.join(outputdir,"%s_ROC_lin.png" % (key)))
+        # plt.clf()
+
+
+
+
+            if self.Flags.profiling:
+                logger.info("doing hls4ml profiling")
+                plt.ion()
+                plt.figure()
+                from hls4ml.model.profiling import numerical
+                # produce 4 plots
+                plots = numerical(model=self.model, hls_model = hls_model, X=train_data)
+                for p,plot in enumerate(plots):
+                    print(plot)
+                    plot.savefig(self.hls4ml_model_folder+"/profiling_plot_%s.pdf" %(p))
+                plt.clf()
+
+
             hls4ml.utils.plot_model(hls_model, show_shapes=True, show_precision=True, to_file=self.hls4ml_model_folder+"/plot.pdf")
             logger.info('compiling the hls_model')
             hls_model.compile()

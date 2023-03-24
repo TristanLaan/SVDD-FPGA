@@ -107,6 +107,8 @@ def SVDD_arguments_parser():
 
     parser.add_argument('--build', type=bool, default=False, help='build model')
 
+    parser.add_argument('--profiling', type=bool, default=False, help='profiling model')
+
     parser.add_argument('--iterations', type=int, default=1, help="number of times the inference procedure is repeated")
 
     parser.add_argument('--precision', type=str, default="float32", help="set precision (default = float32)")
