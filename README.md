@@ -21,3 +21,10 @@ Setup the Conda enviroment later
 '''
 source setupenv.sh
 '''
+
+#
+install hls4ml vitis_port branch using
+#
+'''
+python3 setup.py install --root /home/bryan_esc/.local/bin
+'''

@@ -374,7 +374,8 @@ class VariationalAutoencoderModel():
 
 
             plotting.print_dict(config)
-            
+
+
             print("-----------------------------------")
             self.hls4ml_model_folder = self.modeldir+"/hls4ml_models" + "_" + str(self.ap_fixed_width)+"_"+ str(self.ap_fixed_int) +  "/"+self.filename
             if not os.path.exists(self.modeldir+"/hls4ml_models" + "_" + str(self.ap_fixed_width)+"_"+ str(self.ap_fixed_int)):
@@ -392,8 +393,11 @@ class VariationalAutoencoderModel():
             hls_model = hls4ml.converters.convert_from_keras_model(self.model,
                                                        hls_config=config,
                                                        output_dir=self.hls4ml_model_folder,
-                                                       part='xcu250-figd2104-2L-e')
-
+                                                       part='xcvc1902-vsvd1760-2MP-e-S',
+                                                       board ="vck5000",
+                                                       backend='Vivado',
+                                                       clock_period=500 )  # Filler.
+#xcu250-figd2104-2L-e,
             hls4ml.utils.plot_model(hls_model, show_shapes=True, show_precision=True, to_file=self.hls4ml_model_folder+"/plot.pdf")
             logger.info('compiling the hls_model')
             hls_model.compile()
