@@ -2,7 +2,8 @@
 #SBATCH -t 24:00:00
 #SBATCH -N 1
 #SBATCH -p xilinx
-#SBATCH --tasks-per-node 15
+#SBATCH --tasks-per-node 95
+#SBATCH --mem=256G
 
 #Finally, some applications run more efficiently if you leave one core free (i.e. specify 15 tasks for a 16-core node); the only way to know this, is to test your applications using both settings.
 timestamp() {

@@ -405,10 +405,8 @@ class VariationalAutoencoderModel():
                                                        hls_config=config,
                                                        output_dir=self.hls4ml_model_folder,
                                                        part='xcvc1902-vsvd1760-2MP-e-S',
-                                                       board ="vck5000",
-                                                       backend='Vivado',
-                                                       clock_period=500,
-                                                       part='xcu250-figd2104-2L-e')
+                                                       backend='Vitis',
+                                                       clock_period=500)
 
 
 
