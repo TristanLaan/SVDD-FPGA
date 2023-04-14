@@ -38,6 +38,8 @@ import h5py
 import hls4ml
 import plotting
 
+print(hls4ml.utils.config_from_keras_model)
+
 ################################################################################################################
 ################################################################################################################
 import logging
@@ -118,7 +120,7 @@ class VariationalAutoencoderModel():
 
         self.model = model
         return
-    
+
     def z_log_var_activation(self, x):
         return K.sigmoid(x) * 10
 
@@ -166,7 +168,7 @@ class VariationalAutoencoderModel():
         #
         x = Dense(256, activation='elu')(inputs)
         x = Dense(128, activation='elu')(x)
-        
+
         x = Dense(8, activation='elu')(inputs)
         """
         z_mean = Dense(self.dim_z, name='z_mean', activation='linear')(x)
@@ -180,15 +182,15 @@ class VariationalAutoencoderModel():
 
     def build_lhcdata_model_quantised(self):
         model = Sequential()
-        
+
         if self.mode == 'ordered':
             inputs = Input(shape=(self.D,), name='in_regression')
 
 
         model.add(QDense(self.hidden_layers[0], input_shape=(self.D,), name='fc1',
-                 kernel_quantizer=quantized_bits(self.bits,0,alpha=1), 
+                 kernel_quantizer=quantized_bits(self.bits,0,alpha=1),
                  bias_quantizer=quantized_bits(self.bits,0,alpha=1),
-                 kernel_initializer='lecun_uniform', 
+                 kernel_initializer='lecun_uniform',
                  kernel_regularizer=l1(0.0001))
                  )
 
@@ -198,9 +200,9 @@ class VariationalAutoencoderModel():
                 if (i > 0):
 
                     model.add(QDense(v, name='fc%s' %(str(i+1)),
-                        kernel_quantizer=quantized_bits(self.bits,0,alpha=1), 
+                        kernel_quantizer=quantized_bits(self.bits,0,alpha=1),
                         bias_quantizer=quantized_bits(self.bits,0,alpha=1),
-                        kernel_initializer='lecun_uniform', 
+                        kernel_initializer='lecun_uniform',
                         kernel_regularizer=l1(0.0001))
                     )
                     model.add(QActivation(activation=quantized_relu(self.bits),  name='relu%s' %(str(i+1))))
@@ -212,14 +214,14 @@ class VariationalAutoencoderModel():
         #
         x = Dense(256, activation='elu')(inputs)
         x = Dense(128, activation='elu')(x)
-        
+
         x = Dense(8, activation='elu')(inputs)
         """
         i = len(self.hidden_layers) + 1
         model.add(QDense(self.dim_z, name='fc%s' %(str(i+2)),
-                        kernel_quantizer=quantized_bits(self.bits,0,alpha=1), 
+                        kernel_quantizer=quantized_bits(self.bits,0,alpha=1),
                         bias_quantizer=quantized_bits(self.bits,0,alpha=1),
-                        kernel_initializer='lecun_uniform', 
+                        kernel_initializer='lecun_uniform',
                         kernel_regularizer=l1(0.0001))
                     )
 
@@ -245,7 +247,7 @@ class VariationalAutoencoderModel():
         outpath = os.path.join(outdir,self.model_filename)
         print(outpath)
 
-        
+
         earlystopper = EarlyStopping(monitor='loss', patience=50, verbose=0, min_delta=1e-7)
         # checkpointer = ModelCheckpoint(filepath=outpath, monitor='loss', verbose=1,save_weights_only=False, save_best_only=True)
         reduce_lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience=5, min_lr=0.000000001)
@@ -271,27 +273,27 @@ class VariationalAutoencoderModel():
         cur_patience = 0
         max_patience_lr = 5
         max_patience_quit = 10
-        
+
         # Or have 2 output arms with the same output that have different inputs and train like that?
         # Or latent space that is much hgiher than inut space, as this problem is much
         # more complex?
         self.model.compile(optimizer='adam', loss='mean_squared_error')
 
 
-        
-        
+
+
 
 
 
         print(self.model.get_weights()[0])
         res_train = self.model.fit(
-            train, 
+            train,
             self.MSE(self.c, self.dataset_len, self.dim_z),
             #self.loss_fn(train[0].shape[0], self.dim_z),
-            batch_size=batch_size, 
+            batch_size=batch_size,
             epochs=epochs,
             shuffle=True,
-            verbose=1 if self.verbose else 0, 
+            verbose=1 if self.verbose else 0,
             callbacks=callbacks
         )
 
@@ -303,7 +305,7 @@ class VariationalAutoencoderModel():
         else:
             self.model = model
 
-        
+
         for l,layer in enumerate(self.model.layers):
             print(layer.name, layer)
             w = self.model.get_weights()[l]
@@ -338,7 +340,7 @@ class VariationalAutoencoderModel():
             # config['LayerName']['softmax']['inv_table_t'] = 'ap_fixed<18,4>'
             ap_fixed = "<" + str(self.ap_fixed_width)+","+ str(self.ap_fixed_int) + ">"
             config['Model']['Precision'] = 'ap_fixed' + ap_fixed
-            
+
             # plotting.print_dict(config)
             config.pop('LayerName')
 
@@ -405,10 +407,8 @@ class VariationalAutoencoderModel():
                                                        hls_config=config,
                                                        output_dir=self.hls4ml_model_folder,
                                                        part='xcvc1902-vsvd1760-2MP-e-S',
-                                                       board ="vck5000",
-                                                       backend='Vivado',
-                                                       clock_period=500,
-                                                       part='xcu250-figd2104-2L-e')
+                                                       backend='Vitis',
+                                                       clock_period=500)
 
 
 
@@ -442,7 +442,7 @@ class VariationalAutoencoderModel():
                 plt.clf()
 
 
-            hls4ml.utils.plot_model(hls_model, show_shapes=True, show_precision=True, to_file=self.hls4ml_model_folder+"/plot.pdf")
+            # hls4ml.utils.plot_model(hls_model, show_shapes=True, show_precision=True, to_file=self.hls4ml_model_folder+"/plot.pdf")
             logger.info('compiling the hls_model')
             hls_model.compile()
             self.hls4ml_model = hls_model
@@ -507,7 +507,7 @@ class VariationalAutoencoderModel():
     #     latent_space = self.model.predict(data, batch_size=batch_size, verbose=self.verbose)
 
     #     # scores = get_R(latent_space - self.MSE(self.c, latent_space.shape[0], self.dim_z))
- 
+
     #     scores_r = 1
     #     return scores_r
 
@@ -518,10 +518,10 @@ class VariationalAutoencoderModel():
 
         test_bg_scores = get_R(latent_space_bg - self.loss_fn(latent_space_bg.shape[0], self.dim_z))
         test_sig_scores = get_R(latent_space_sig - self.loss_fn(latent_space_sig.shape[0], self.dim_z))
-        
+
         self.radius_bg = test_bg_scores
         self.radius_sig = test_sig_scores
-        
+
         self.test_bg_scores_r = test_bg_scores / self.max_radius
         self.test_sig_scores_r = test_sig_scores / self.max_radius
         return test_bg_scores, test_sig_scores
@@ -530,7 +530,7 @@ class VariationalAutoencoderModel():
 
 def evaluate_efficiencies(labels, events):
     fpr, tpr, _ = roc_curve(labels, events)
-    
+
     #background efficiencies
     efficiency1 = 10.0**-2
     efficiency2 = 10.0**-3
@@ -542,7 +542,7 @@ def evaluate_efficiencies(labels, events):
     epsilon2 = 0.0
     epsilon3 = 0.0
     epsilon4 = 0.0
-   
+
     #flags to tell when done
     done1 = False
     done2 = False
@@ -568,4 +568,4 @@ def evaluate_efficiencies(labels, events):
         if done1 and done2 and done3 and done4:
             break
 
-    return epsilon1, epsilon2, epsilon3, epsilon4 
+    return epsilon1, epsilon2, epsilon3, epsilon4
